@@ -46,6 +46,7 @@ jobs:
 
     outputs:
       image: ${{ steps.image.outputs.image }}
+      image_name: ${{ steps.image.outputs.image_name }}
       image_tag: ${{ steps.image.outputs.image_tag }}
 
     permissions:
@@ -159,6 +160,7 @@ jobs:
           owner_type = "orgs" if owner_name == "scientificcomputing" else "users"
           
           versions_url = f"https://api.github.com/{owner_type}/{owner_name}/packages/container/${{needs.build.outputs.image_name}}/versions"
+          print(versions_url)
           versions = s.get(versions_url).json()
           print(versions)
           print(f"Found {len(versions)} versions")
