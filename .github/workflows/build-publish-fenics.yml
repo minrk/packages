@@ -125,7 +125,7 @@ jobs:
 
     permissions:
       contents: read
-      packages: write
+      packages: write,delete
 
     steps:
       - run: echo '${{ toJSON(needs.build.outputs) }}'
@@ -144,11 +144,31 @@ jobs:
             docker buildx imagetools create --append "${{ needs.build.outputs.image_tag }}-amd64" "${{ needs.build.outputs.image_tag }}-arm64" --tag "${{ needs.build.outputs.image_tag }}"
       
       - name: delete intermediate images
+        run:
+          python3 -m pip list
+      
+      - name: delete intermediate images
+        shell: python
         run: |
-          for platform in amd64 arm64; do
-            GH_package_id=$(gh api \
-          -H "Accept: application/vnd.github+json" \
-          -H "X-GitHub-Api-Version: 2022-11-28" \
-          /users/${{github.repository_owner}}/packages/container/${{needs.build.outputs.image_name}}/versions | \
-          jq -r '.[] | select(.name == "${{ steps.build-push-action.outputs.digest }}") | .id')
-          echo "GH_package_id=$GH_package_id" >> $GITHUB_ENV
+          import os
+          import requests
+          
+          s = requests.Session()
+          s.headers = {"Authorization": "Bearer ${{ secrets.GITHUB_TOKEN }}"}
+          owner_name = "${{ github.repository_owner }}"
+          owner_type = "orgs" if owner_name == "scientificcomputing" else "users"
+          
+          versions_url = f"https://api.github.com/{owner_type}/{owner_name}/packages/container/${{needs.build.outputs.image_name}}/versions"
+          versions = s.get(versions_url).json()
+          print(versions)
+          print(f"Found {len(versions)} versions")
+          tag_base = "${{ needs.build.outputs.tag }}"
+          tags_to_delete = {f"{tag_base}-{plat}" for plat in ("amd64", "arm64") }
+          for version in versions:
+              tags = version['metadata']['container']['tags']
+              if set(tags).intersection(tags_to_delete):
+                version_id = version["id"]
+                print("Deleting version {version_id}: {tags}")
+                s.delete(f"{versions_url}/{version_id}")
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
