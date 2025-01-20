@@ -114,7 +114,7 @@ jobs:
           platforms: linux/${{ matrix.platform }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ image_tag }}
+          cache-from: type=registry,ref=${{ steps.image.outputs.image_tag }}
           cache-to: type=inline
 
 
