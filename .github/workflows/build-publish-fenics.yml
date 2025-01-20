@@ -45,9 +45,8 @@ jobs:
     runs-on: ${{ matrix.machine }}
 
     outputs:
-      image: ${{ steps.output_image.outputs.image }}
-      tags_amd64: ${{ steps.output_tags.outputs.tags_amd64 }}
-      tags_arm64: ${{ steps.output_tags.outputs.tags_arm64 }}
+      image: ${{ steps.image.outputs.image }}
+      image_tag: ${{ steps.image.outputs.image_tag }}
 
     permissions:
       contents: read
