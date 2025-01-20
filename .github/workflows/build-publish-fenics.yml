@@ -68,9 +68,9 @@ jobs:
 
       - name: Output image
         id: image
-        run:
+        run: |
           image_name=${{ github.event.inputs.image_name || env.IMAGE_NAME }}
-          echo image_name=${image_name} >> "${GITHUB_OUTPUT}"
+          echo "image_name=${image_name}" >> "${GITHUB_OUTPUT}"
           echo image="${{ env.REGISTRY }}/${{ github.repository_owner }}/${image_name}" >> "${GITHUB_OUTPUT}"
 
       - name: Extract metadata (tags, labels) for Docker
