@@ -129,7 +129,6 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - run:
-          name: merge manifests to publish multi-arch build
-          command: |
+      - name: merge manifests to publish multi-arch build
+        run: |
             docker buildx imagetools create --append "$IMAGE" --append "${tags.arm}" --tag "$IMAGE"
