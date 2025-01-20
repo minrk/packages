@@ -30,6 +30,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ci-test
+  TAG: latest
 
 jobs:
   build:
@@ -68,10 +69,16 @@ jobs:
 
       - name: Output image
         id: image
+        # store image name, tag in variables
         run: |
           image_name=${{ github.event.inputs.image_name || env.IMAGE_NAME }}
+          image="${{ env.REGISTRY }}/${{ github.repository_owner }}/${image_name}"
+          tag="${{ github.event.inputs.release_tag || env.TAG }}"
+          image_tag="${image}:${tag}"
           echo "image_name=${image_name}" >> "${GITHUB_OUTPUT}"
-          echo image="${{ env.REGISTRY }}/${{ github.repository_owner }}/${image_name}" >> "${GITHUB_OUTPUT}"
+          echo image="${image}" >> "${GITHUB_OUTPUT}"
+          echo tag="${tag}" >> "${GITHUB_OUTPUT}"
+          echo image_tag="${image_tag}" >> "${GITHUB_OUTPUT}"
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
@@ -83,13 +90,8 @@ jobs:
 
           images: ${{ steps.image.outputs.image }}
           tags: |
-            type=raw,value=${{ github.event.inputs.release_tag }}
+            type=raw,value=${{ steps.image.outputs.tag }}-${{ matrix.platform }}
       
-      - name: Output tags
-        id: output_tags
-        run:
-          echo tags_${{ matrix.platform }}=${{ steps.meta.outputs.tags }} >> "${GITHUB_OUTPUT}"
-
       - name: Build ${{ matrix.platform }} docker image
         uses: docker/build-push-action@v5
         with:
@@ -99,20 +101,20 @@ jobs:
           platforms: linux/${{ matrix.platform }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ steps.image.outputs.image }}:${{ github.event.inputs.release_tag }}
+          cache-from: type=registry,ref=${{ steps.image.outputs.image_tag }}
           cache-to: type=inline
 
       - name: Build and push Docker image
         if: ${{ github.event_name == 'workflow_dispatch' }}
         uses: docker/build-push-action@v5
         with:
-          context: "{{defaultContext}}:${{ github.event.inputs.image_name }}"
+          context: "{{defaultContext}}:${{ steps.image.outputs.image_name }}"
           push: true
           provenance: false  # removes unknown/unknown manifest
           platforms: linux/${{ matrix.platform }}
-          tags: ${{ steps.image.outputs.image }}:${{ github.event.inputs.release_tag }}
+          tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ steps.image.outputs.image }}:${{ github.event.inputs.release_tag }}
+          cache-from: type=registry,ref=${{ image_tag }}
           cache-to: type=inline
 
 
