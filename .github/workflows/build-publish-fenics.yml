@@ -88,7 +88,7 @@ jobs:
           context: "{{defaultContext}}:${{ github.event.inputs.image_name || env.IMAGE_NAME }}"
           push: false
           load: true
-          platforms: linux/${{ platform }}
+          platforms: linux/${{ matrix.platform }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.inputs.image_name || env.IMAGE_NAME }}:${{ github.event.inputs.release_tag }}
