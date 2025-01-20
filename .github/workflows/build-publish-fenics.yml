@@ -169,9 +169,10 @@ jobs:
           tags_to_delete = {f"{tag_base}-{plat}" for plat in ("amd64", "arm64") }
           for version in versions:
               tags = version['metadata']['container']['tags']
-              if set(tags).intersection(tags_to_delete):
+              if set(tags).intersection(tags_to_delete)or not tags:
                 version_id = version["id"]
-                print("Deleting version {version_id}: {tags}")
-                s.delete(f"{versions_url}/{version_id}")
+                print(f"Deleting version {version_id}: {tags}")
+                r = s.delete(f"{versions_url}/{version_id}")
+                print(r.json())
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
