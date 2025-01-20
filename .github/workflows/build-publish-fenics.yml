@@ -160,7 +160,7 @@ jobs:
           owner_name = "${{ github.repository_owner }}"
           owner_type = "orgs" if owner_name == "scientificcomputing" else "users"
           
-          versions_url = f"https://api.github.com/{owner_type}/{owner_name}/packages/container/${{needs.build.outputs.image_name}}/versions"
+          versions_url = f"https://api.github.com/{owner_type}/{owner_name}/packages/container/${{needs.build.outputs.image_name}}/versions?state=active"
           print(versions_url)
           versions = s.get(versions_url).json()
           print(versions)
@@ -172,7 +172,8 @@ jobs:
               if set(tags).intersection(tags_to_delete)or not tags:
                 version_id = version["id"]
                 print(f"Deleting version {version_id}: {tags}")
+                version_url
                 r = s.delete(f"{versions_url}/{version_id}")
-                print(r.json())
+                print(r.status_code)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
