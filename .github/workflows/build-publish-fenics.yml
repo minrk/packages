@@ -80,7 +80,7 @@ jobs:
       - name: Output tags
         id: output_tags
         run:
-          echo tags_${{ matrix.platform }}=${{ ${{ steps.meta.outputs.tags }} >> "${GITHUB_OUTPUT}"
+          echo tags_${{ matrix.platform }}=${{ steps.meta.outputs.tags }} >> "${GITHUB_OUTPUT}"
 
       - name: Build ${{ matrix.platform }} docker image
         uses: docker/build-push-action@v5
