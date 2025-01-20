@@ -44,6 +44,7 @@ jobs:
     runs-on: ${{ matrix.machine }}
 
     outputs:
+      image: ${{ steps.output_image.outputs.image }}
       tags_amd64: ${{ steps.output_tags.outputs.tags_amd64 }}
       tags_arm64: ${{ steps.output_tags.outputs.tags_arm64 }}
 
@@ -65,15 +66,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Output image
+        id: image
+        run:
+          image_name=${{ github.event.inputs.image_name || env.IMAGE_NAME }}
+          echo image_name=${image_name} >> "${GITHUB_OUTPUT}"
+          echo image="${{ env.REGISTRY }}/${{ github.repository_owner }}/${image_name}" >> "${GITHUB_OUTPUT}"
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
           labels: |
-            org.opencontainers.image.title=${{ github.event.inputs.image_name || env.IMAGE_NAME }}
+            org.opencontainers.image.title=${{ steps.image.outputs.image_name }}
             org.opencontainers.image.description=${{ github.event.inputs.image_description }}
 
-          images: ${{ github.GITHUB_REPOSITORY }}/${{ github.event.inputs.image_name || env.IMAGE_NAME }}
+          images: ${{ steps.image.outputs.image }}
           tags: |
             type=raw,value=${{ github.event.inputs.release_tag }}
       
@@ -85,13 +93,13 @@ jobs:
       - name: Build ${{ matrix.platform }} docker image
         uses: docker/build-push-action@v5
         with:
-          context: "{{defaultContext}}:${{ github.event.inputs.image_name || env.IMAGE_NAME }}"
+          context: "{{defaultContext}}:${{ steps.image.outputs.image_name }}"
           push: false
           load: true
           platforms: linux/${{ matrix.platform }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.inputs.image_name || env.IMAGE_NAME }}:${{ github.event.inputs.release_tag }}
+          cache-from: type=registry,ref=${{ steps.image.outputs.image }}:${{ github.event.inputs.release_tag }}
           cache-to: type=inline
 
       - name: Build and push Docker image
@@ -102,9 +110,9 @@ jobs:
           push: true
           provenance: false  # removes unknown/unknown manifest
           platforms: linux/${{ matrix.platform }}
-          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.inputs.image_name }}:${{ github.event.inputs.release_tag }}
+          tags: ${{ steps.image.outputs.image }}:${{ github.event.inputs.release_tag }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.inputs.image_name }}:${{ github.event.inputs.release_tag }}
+          cache-from: type=registry,ref=${{ steps.image.outputs.image }}:${{ github.event.inputs.release_tag }}
           cache-to: type=inline
 
 
@@ -131,4 +139,4 @@ jobs:
 
       - name: merge manifests to publish multi-arch build
         run: |
-            docker buildx imagetools create --append "$IMAGE" --append "${tags.arm}" --tag "$IMAGE"
+            docker buildx imagetools create --append "${{ needs.build.outputs.image }}-amd64" "${{ needs.build.outputs.image }}-arm" --tag "${{ needs.build.outputs.image }}"
