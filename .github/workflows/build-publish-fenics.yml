@@ -20,17 +20,33 @@ on:
         description: "Description of package"
         default: "Some description"
         type: string
+  push:
+    branches:
+      - merged
   pull_request:
     branches:
       - main
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: fenics
+  IMAGE_NAME: ci-test
 
 jobs:
-  build-and-push-image:
-    runs-on: ubuntu-latest
+  build:
+    strategy:
+      matrix:
+        include:
+          - platform: arm64
+            machine: ubuntu-24.04-arm
+          - platform: amd64
+            machine: ubuntu-24.04
+
+    runs-on: ${{ matrix.machine }}
+
+    outputs:
+      tags_amd64: ${{ steps.output_tags.outputs.tags_amd64 }}
+      tags_arm64: ${{ steps.output_tags.outputs.tags_arm64 }}
+
     permissions:
       contents: read
       packages: write
@@ -38,9 +54,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -63,35 +76,23 @@ jobs:
           images: ${{ github.GITHUB_REPOSITORY }}/${{ github.event.inputs.image_name || env.IMAGE_NAME }}
           tags: |
             type=raw,value=${{ github.event.inputs.release_tag }}
+      
+      - name: Output tags
+        id: output_tags
+        run:
+          echo tags_${{ matrix.platform }}=${{ ${{ steps.meta.outputs.tags }} >> "${GITHUB_OUTPUT}"
 
-
-      - name: Build AMD docker image
+      - name: Build ${{ matrix.platform }} docker image
         uses: docker/build-push-action@v5
         with:
-          context: "{{defaultContext}}:fenics"
+          context: "{{defaultContext}}:${{ github.event.inputs.image_name || env.IMAGE_NAME }}"
           push: false
           load: true
-          platforms: linux/amd64
-          tags: ${{ steps.meta-testing.outputs.tags }}
-          labels: ${{ steps.meta-testing.outputs.labels }}
+          platforms: linux/${{ platform }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.inputs.image_name || env.IMAGE_NAME }}:${{ github.event.inputs.release_tag }}
           cache-to: type=inline
-
-     
-
-      - name: Trigger circleci build for ARM
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        run: |
-          CIRCLE_RESP=$(curl \
-            --request POST \
-            --url https://circleci.com/api/v2/project/github/scientificcomputing/packages/pipeline \
-            -u "${{ secrets.CIRCLECI_TOKEN }}:" \
-            --header "Content-Type: application/json" \
-            --data '{ "parameters": ${{ toJSON(github.event.inputs) }}, "branch": "${{ github.ref_name }}" }'
-          )
-          echo $CIRCLE_RESP
-
-          echo "[CircleCI Job](https://app.circleci.com/pipelines/github/scientificcomputing/packages/$(echo $CIRCLE_RESP | jq -r .number))" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build and push Docker image
         if: ${{ github.event_name == 'workflow_dispatch' }}
@@ -100,8 +101,35 @@ jobs:
           context: "{{defaultContext}}:${{ github.event.inputs.image_name }}"
           push: true
           provenance: false  # removes unknown/unknown manifest
-          platforms: linux/amd64 #,linux/arm64
+          platforms: linux/${{ matrix.platform }}
           tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.inputs.image_name }}:${{ github.event.inputs.release_tag }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ github.event.inputs.image_name }}:${{ github.event.inputs.release_tag }}
           cache-to: type=inline
+
+
+  publish-multiarch:
+    runs-on: ubuntu-24.04
+    needs:
+      - build
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - run: echo '${{ toJSON(needs.build.outputs) }}'
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - run:
+          name: merge manifests to publish multi-arch build
+          command: |
+            docker buildx imagetools create --append "$IMAGE" --append "${tags.arm}" --tag "$IMAGE"
