@@ -125,7 +125,7 @@ jobs:
 
     permissions:
       contents: read
-      packages: write,delete
+      packages: write
 
     steps:
       - run: echo '${{ toJSON(needs.build.outputs) }}'
