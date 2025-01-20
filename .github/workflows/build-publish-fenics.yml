@@ -89,6 +89,7 @@ jobs:
 
           images: ${{ steps.image.outputs.image }}
           tags: |
+            type=raw,value=${{ steps.image.outputs.tag }}
             type=raw,value=${{ steps.image.outputs.tag }}-${{ matrix.platform }}
       
       - name: Build ${{ matrix.platform }} docker image
@@ -140,7 +141,7 @@ jobs:
 
       - name: merge manifests to publish multi-arch build
         run: |
-            docker buildx imagetools create --append "${{ needs.build.outputs.image_tag }}-amd64" "${{ needs.build.outputs.image_tag }}-arm" --tag "${{ needs.build.outputs.image }}"
+            docker buildx imagetools create --append "${{ needs.build.outputs.image_tag }}-amd64" "${{ needs.build.outputs.image_tag }}-arm64" --tag "${{ needs.build.outputs.image_tag }}"
       
       - name: delete intermediate images
         run: |
